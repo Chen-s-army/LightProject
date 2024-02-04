@@ -231,7 +231,7 @@ export default {
           }
           console.log(dataToCreate);
           // 发送创建项目的 HTTP 请求
-          const response = await axios.post(`http://localhost:8026/api/work_order/items`, { data: dataToCreate });
+          const response = await axios.post(`http://122.51.210.27:8026/api/work_order/items`, { data: dataToCreate });
 
           // 处理响应，显示成功消息等
           await this.$message.success(response.data);

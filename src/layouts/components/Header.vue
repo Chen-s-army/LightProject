@@ -4,9 +4,11 @@
       <template #logo>
         <span v-if="showLogo" class="header-logo-container" @click="handleNav('/dashboard/base')">
 <!--         <logo-full class="t-logo" />-->
+         <Logo class="t-logo" />
+
         </span>
         <div v-else class="header-operate-left">
-                            <t-button theme="default" shape="square" variant="text" @click="changeCollapsed">
+          <t-button theme="default" shape="square" variant="text" @click="changeCollapsed">
             <view-list-icon class="collapsed-icon" />
           </t-button>
 <!--          <search :layout="layout" />-->
@@ -15,11 +17,16 @@
       <menu-content v-show="layout !== 'side'" class="header-menu" :navData="menu" />
       <template #operations>
         <div class="operations-container">
+          <div class="current-time">{{ currentTime }}</div>
+          <div class="mqtt-link">
+            <icon name="cloud"/>
+            {{mqttConnectionStatus}}
+          </div>
 <!--          &lt;!&ndash; 搜索框 &ndash;&gt;-->
 <!--          <search v-if="layout !== 'side'" :layout="layout" />-->
 
           <!-- 全局通知 -->
-          <notice />
+<!--          <notice />-->
 
           <t-dropdown :min-column-width="125" trigger="click">
             <template #dropdown>
@@ -66,15 +73,19 @@ import {
 } from 'tdesign-icons-vue';
 import { prefix } from '@/config/global';
 import LogoFull from '@/assets/assets-logo-full.svg';
-
+import Logo from '@/assets/a.svg';
+import {Icon} from 'tdesign-icons-vue';
 import Notice from './Notice.vue';
 import Search from './Search.vue';
 import MenuContent from './MenuContent.vue';
+import mqtt from "mqtt";
 
 export default Vue.extend({
   components: {
     MenuContent,
+    Icon,
     LogoFull,
+    Logo,
     Notice,
     Search,
     ViewListIcon,
@@ -116,6 +127,8 @@ export default Vue.extend({
       prefix,
       visibleNotice: false,
       isSearchFocus: false,
+      currentTime: '',
+      mqttConnectionStatus: '',
     };
   },
   computed: {
@@ -146,7 +159,46 @@ export default Vue.extend({
       ];
     },
   },
+  mounted() {
+    this.initMqtt()
+    this.updateCurrentTime();
+    setInterval(this.updateCurrentTime, 1000);
+  },
   methods: {
+    initMqtt() {
+      // 连接配置选项
+      const options = {
+        connectTimeout: 4000, // 超时时间
+        clientId: "", // 不填默认随机生成一个ID
+      }
+      // 连接成功
+      this.client = mqtt.connect("ws://106.15.121.181:8083/mqtt", options)
+      this.client1 = mqtt.connect("ws://122.51.210.27:8083/mqtt", options)
+      this.client.on("connect", () => {
+        this.mqttConnectionStatus = "已连接"
+        console.log("连接成功")
+      })
+
+      // 重连提醒
+      this.client.on("reconnect", () => {
+        this.mqttConnectionStatus = "正在重连"
+        console.log("正在重连")
+      })
+
+      // 连接失败提醒
+      this.client.on("error", (error) => {
+        this.mqttConnectionStatus = "连接失败"
+        console.log("连接失败", error)
+      })
+    },
+    //显示当前系统时间
+    updateCurrentTime() {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const seconds = now.getSeconds().toString().padStart(2, '0');
+      this.currentTime = `${hours}:${minutes}:${seconds}`;
+    },
     toggleSettingPanel() {
       this.$store.commit('setting/toggleSettingPanel', true);
     },
@@ -202,6 +254,19 @@ export default Vue.extend({
       margin-right: 16px;
     }
   }
+  .current-time {
+    color: var(--td-text-color-primary);
+    margin-right: 16px;
+    font-weight: bold;
+  }
+
+  .mqtt-link {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    margin-right: 16px;
+    font-weight: bold;
+  }
 }
 
 .header-operate-left {
@@ -217,12 +282,13 @@ export default Vue.extend({
 
 .header-logo-container {
   width: 184px;
-  height: 26px;
+  height: 126px;
   display: flex;
   margin-left: 24px;
   color: var(--td-text-color-primary);
 
   .t-logo {
+    align-content: center;
     width: 100%;
     height: 100%;
 

@@ -1,34 +1,47 @@
 <template>
   <t-row :gutter="[16, 16]">
-
-    <t-col :xs="6" :xl="3" v-for="(item, index) in panelList" :key="item.title">
+    <t-col v-for="(item, index) in PANE_LIST" :key="item.title" :xl="3" :xs="6">
       <t-card
         :bordered="false"
-        :title="item.title"
+        :class="{ 'dashboard-item': true, 'dashboard-item--main-color': index === 0 }"
         :style="{ height: '140px' }"
-        :class="{ 'dashboard-item': true, 'dashboard-item--main-color': index == 0 }"
-      >
+        :title="item.title"
+      >gid
         <div class="dashboard-item-top">
-          <span :style="{ fontSize: `${resizeTime * 36}px` }">{{ item.number }}</span>
+          <span :style="{ fontSize: `${resizeTime * 36}px` }">
+          <!-- 使用条件判断，判断当前是第四个表格 -->
+            <template v-if="index === 3">
+            <div>
+                <t-select
+                  v-model="selectedProject"
+                  :borderless="true"
+                  :options="PROJECT_SELECTION"
+                  size="large"
+                  style="width: 210px"
+                />
+             </div>
+            </template>
+            <template v-else>{{ item.number }}</template>
+        </span>
         </div>
         <div class="dashboard-item-left">
           <div
             v-if="index === 0"
             id="moneyContainer"
-            class="dashboard-chart-container"
             :style="{ width: `${resizeTime * 120}px`, height: `${resizeTime * 66}px` }"
+            class="dashboard-chart-container"
           ></div>
           <div
             v-else-if="index === 1"
             id="refundContainer"
-            class="dashboard-chart-container"
             :style="{ width: `${resizeTime * 120}px`, height: `${resizeTime * 42}px` }"
+            class="dashboard-chart-container"
           ></div>
           <span v-else-if="index === 2" :style="{ marginTop: `-24px` }">
-            <ErrorIcon />
+            <ErrorIcon/>
           </span>
           <span v-else :style="{ marginTop: '-24px' }">
-          <WifiIcon />
+          <ViewListIcon />
           </span>
         </div>
       </t-card>
@@ -36,20 +49,20 @@
   </t-row>
 </template>
 <script>
-import { LineChart, BarChart } from 'echarts/charts';
+import {LineChart, BarChart} from 'echarts/charts';
 import * as echarts from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { UsergroupIcon, FileIcon, ChevronRightIcon,ErrorIcon,WifiIcon } from 'tdesign-icons-vue';
-import { mapState } from 'vuex';
-
+import {CanvasRenderer} from 'echarts/renderers';
+import {UsergroupIcon, FileIcon, ChevronRightIcon, ErrorIcon, ViewListIcon} from 'tdesign-icons-vue';
+import {mapState} from 'vuex';
+import {ChevronDownIcon} from 'tdesign-icons-vue';
 import Trend from '@/components/trend/index.vue';
 
-import { constructInitDashboardDataset } from '../index';
-import { changeChartsTheme } from '@/utils/color';
-import { PANE_LIST } from '@/service/service-base';
+import {constructInitDashboardDataset} from '../index';
+import {changeChartsTheme} from '@/utils/color';
+import {PANE_LIST} from '@/service/service-base';
+import axios from "axios";
 
 echarts.use([LineChart, BarChart, CanvasRenderer]);
-
 export default {
   name: 'TopPanel',
   components: {
@@ -58,12 +71,36 @@ export default {
     FileIcon,
     ChevronRightIcon,
     ErrorIcon,
-    WifiIcon,
+    ViewListIcon,
+    ChevronDownIcon,
   },
   data() {
     return {
       resizeTime: 1,
       panelList: PANE_LIST,
+      selectedProject: '全部项目',
+      PROJECT_SELECTION: [],
+      PANE_LIST: [
+        {
+          title: "总灯数（个）",
+          number: "N/A",
+        },
+        {
+          title: "本周能耗总数（Kw‧h）",
+          number: "N/A",
+          downTrend: "20.5%",
+        },
+        {
+          title: "预警数（个数）",
+          number: "N/A",
+          upTrend: "30.5%",
+        },
+        {
+          title: "当前项目",
+          number: "",
+          downTrend: "40.5%",
+        },
+      ],
     };
   },
   computed: {
@@ -81,15 +118,80 @@ export default {
     },
   },
   mounted() {
+    this.fetchData()
     this.$nextTick(() => {
       this.updateContainer();
     });
-
+    setInterval(() => {
+      this.fetchData();
+    }, 1000);
     window.addEventListener('resize', this.updateContainer, false);
     this.renderCharts();
   },
 
   methods: {
+    async fetchData() {
+      try {
+        const response1 = await axios.get('http://122.51.210.27:8026/api/light_data/items')
+
+        let params = {};
+        // 如果选中的项目不是 '全部项目'，则设置筛选参数
+        if (this.selectedProject !== '全部项目') {
+          params = {
+            project: this.selectedProject, // 使用选定的项目值
+          };
+        }
+
+        // 使用筛选参数进行API请求
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items', {params});
+
+        // 使用筛选后的结果更新组件数据
+        this.lightData = response.data;
+        // 使用 reduce 方法计算所有 "power" 属性值的总和
+        const totalPower = this.lightData.reduce((accumulator, currentValue) => {
+          const powerValue = parseFloat(currentValue.power) || 0 // 将 "power" 转换为数字，如果无效则为 0
+          return accumulator + powerValue
+        }, 0)
+
+        const currentTime = new Date()
+
+        this.$set(this.PANE_LIST, 0, {
+          title: "总灯数（个）",
+          number: this.lightData.length,
+        });
+        this.$set(this.PANE_LIST, 1, {
+          title: "本周能耗总数（Kw‧h）",
+          number: totalPower,
+        });
+
+        // 计算与当前时间差两小时的设备数量
+        const devicesWithinTwoHours = this.lightData.filter(item => {
+          const consumptionUpdateTime = new Date(item.ConsumptionUpdate)
+          const timeDifference = currentTime.getTime() - consumptionUpdateTime.getTime()
+          return timeDifference > 2 * 60 * 60 * 1000
+        })
+
+        this.$set(this.PANE_LIST, 2, {
+          title: "预警数（个数）",
+          number: devicesWithinTwoHours.length,
+        });
+
+        this.selecteData = response1.data;
+        this.selecteData = this.selecteData.filter((item, index, self) => {
+          const isDuplicate = self.findIndex(el => el.project === item.project) !== index;
+          return !isDuplicate;
+        });
+        this.PROJECT_SELECTION = [
+          {label: '全部项目', value: '全部项目'},
+          ...new Set(this.selecteData.map(item => ({
+            label: item.project,
+            value: item.project,
+          })))
+        ];
+      } catch (error) {
+        console.error('获取数据时出错', error);
+      }
+    },
     updateContainer() {
       if (document.documentElement.clientWidth >= 1400 && document.documentElement.clientWidth < 1920) {
         this.resizeTime = (document.documentElement.clientWidth / 2080).toFixed(2);
@@ -112,7 +214,7 @@ export default {
     },
 
     renderCharts() {
-      const { chartColors } = this.$store.state.setting;
+      const {chartColors} = this.$store.state.setting;
       // 收入汇总图
       if (!this.moneyContainer) this.moneyContainer = document.getElementById('moneyContainer');
       this.moneyCharts = echarts.init(this.moneyContainer);
@@ -158,7 +260,6 @@ export default {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-
     > span {
       display: inline-block;
       color: var(--td-text-color-primary);
@@ -201,7 +302,7 @@ export default {
       justify-content: center;
       width: 56px;
       height: 56px;
-      background: var(--td-brand-color-1);
+      background: var(--td-brand-color-2);
       border-radius: 50%;
 
       .t-icon {
@@ -230,6 +331,29 @@ export default {
     .dashboard-item-bottom {
       color: var(--td-text-color-anti);
     }
+  }
+
+  .tdesign-demo-dropdown {
+    &__text {
+      display: inline-block;
+      color: var(--td-text-color-primary);
+      font-size: 28px;
+      line-height: 44px;
+      .t-icon {
+        margin-left: 8px;
+      }
+    }
+  }
+  ::v-deep .t-input.t-is-readonly .t-input__inner {
+    font-size: 29px;
+    color: var(--td-text-color-primary);
+  }
+
+  ::v-deep .t-input.t-size-l {
+    height: var(--td-comp-size-xxl);
+    font: var(--td-font-body-large);
+    padding: 0;
+    margin-top: -10px;
   }
 }
 </style>

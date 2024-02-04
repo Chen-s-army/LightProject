@@ -158,7 +158,7 @@ export default Vue.extend({
   methods: {
     async fetchData() {
       try {
-        const response1 = await axios.get('http://localhost:8026/api/light_data/items');
+        const response1 = await axios.get('http://122.51.210.27:8026/api/light_data/items');
         this.lightData = response1.data;
         // 遍历lightData数组，去重，相同项目名称的只保留一个
         this.lightData = this.lightData.filter((item, index, self) => {
@@ -183,16 +183,25 @@ export default Vue.extend({
         }
 
         // 使用筛选参数进行API请求
-        const response = await axios.get('http://localhost:8026/api/light_data/items', {params});
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items', {params});
 
         // 使用筛选后的结果更新组件数据
         this.data = response.data;
 
         // 对数据进行排序（如果需要的话）
         this.data.sort((a, b) => {
-          const clusterA = parseInt(a.cluster);
-          const clusterB = parseInt(b.cluster);
-          return clusterA - clusterB;
+          const clusterA_area = parseInt(a.area);
+          const clusterB_area = parseInt(b.area);
+
+          // 先按照 area 排序
+          if (clusterA_area !== clusterB_area) {
+            return clusterA_area - clusterB_area;
+          } else {
+            // 如果 area 相同，则按照 number 排序
+            const clusterA_number = parseInt(a.number);
+            const clusterB_number = parseInt(b.number);
+            return clusterA_number - clusterB_number;
+          }
         });
 
         // 更新分页的total属性

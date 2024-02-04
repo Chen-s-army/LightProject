@@ -51,8 +51,8 @@ export const PANE_LIST: Array<DashboardPanel> = [
     leftType: "icon-usergroup",
   },
   {
-    title: "MQTT连接状况",
-    number: "N/A",
+    title: "当前项目",
+    number: "",
     downTrend: "40.5%",
     leftType: "icon-file-paste",
   },
@@ -217,16 +217,16 @@ export class DataObtain {
     this.initMqtt()
     setInterval(() => {
       this.fetchData()
+      this.updateNumber()
     }, 1000)
   }
   /**
    *
    * 信息读取函数 后端地址 http://localhost:8026/api/light_data/items
    */
-  // 信息读取
   async fetchData() {
     try {
-      const response = await axios.get("http://localhost:8026/api/light_data/items")
+      const response = await axios.get("http://122.51.210.27:8026/api/light_data/items")
       this.lightData = response.data
 
       // 使用 reduce 方法计算所有 "power" 属性值的总和
@@ -276,24 +276,18 @@ export class DataObtain {
 
       // 连接成功后订阅消息
       this.subscribes()
-      // 更新number属性的值为实际的连接状态
-      this.updateNumber()
     })
 
     // 重连提醒
     this.client.on("reconnect", () => {
       this.mqttConnectionStatus = "正在重连"
       console.log("正在重连")
-      // 更新number属性的值为实际的连接状态
-      this.updateNumber()
     })
 
     // 连接失败提醒
     this.client.on("error", (error) => {
       this.mqttConnectionStatus = "连接失败"
       console.log("连接失败", error)
-      // 更新number属性的值为实际的连接状态
-      this.updateNumber()
     })
   }
 
@@ -386,12 +380,15 @@ export class DataObtain {
       this.tableData.unshift(rowData)
     }
   }
+
+  /**
+   * 通过MQTT的数据更新操作
+   */
   updateNumber() {
     PANE_LIST_DATA[0].number = this.getLatestValueByTopic("online/emqx", "temp")
     PANE_LIST_DATA[1].number = this.getLatestValueByTopic("online/emqx", "hum")
     PANE_LIST_DATA[2].number = this.getLatestValueByTopic("online/emqx", "light")
     PANE_LIST_DATA[3].number = this.getLatestValueByTopic("online/emqx", "power")
-    PANE_LIST[3].number = this.mqttConnectionStatus
   }
 }
 

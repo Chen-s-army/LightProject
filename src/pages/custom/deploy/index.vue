@@ -238,7 +238,7 @@ export default Vue.extend({
           },
         },
       ],
-      rowKey: 'customer',
+      rowKey: 'uuid',
       rowKey1: 'uuid',
       rowKey2: 'device_name',
       tableLayout: 'auto',
@@ -283,7 +283,7 @@ export default Vue.extend({
   methods: {
     async fetchData() {
       try {
-        const response = await axios.get('http://localhost:8026/api/light_data/items');
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items');
         this.originalData = response.data;
 
         const groupedData = {};
@@ -311,7 +311,7 @@ export default Vue.extend({
     },
     async deleteItem(uuid) {
       try {
-        await axios.delete(`http://localhost:8026/api/light_data/items/${uuid}`);
+        await axios.delete(`http://122.51.210.27:8026/api/light_data/items/${uuid}`);
         await this.fetchData();
         console.log('工单删除成功', uuid);
       } catch (error) {

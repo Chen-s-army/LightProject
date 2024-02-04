@@ -13,6 +13,7 @@
                 v-model="selectedAddress"
                 :options="ADDRESS"
                 label="地区"
+                style="width:170px"
               >
               </t-select>
             </t-form-item>
@@ -21,6 +22,7 @@
                 v-model="selectedProject"
                 :options="PROJECT"
                 label="项目"
+                style="width:170px"
               >
               </t-select>
             </t-form-item>
@@ -75,7 +77,7 @@ export default {
     // 灯具信息读取
     async fetchData() {
       try {
-        const response = await axios.get('http://localhost:8026/api/light_data/items');
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items');
         this.lightData = response.data;
         // 第一步筛选项目名称数组
         const uniqueProjects = this.lightData.filter((item, index, self) => {

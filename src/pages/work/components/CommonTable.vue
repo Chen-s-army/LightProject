@@ -260,7 +260,7 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const response1 = await axios.get('http://localhost:8026/api/work_order/items');
+        const response1 = await axios.get('http://122.51.210.27:8026/api/work_order/items');
         this.orderData = response1.data;
         // 遍历orderData数组，去重
         // 第一步筛选客户名称数组
@@ -317,7 +317,7 @@ export default {
           queryString += queryString ? `&type=${encodeURIComponent(this.selectedType)}` : `?type=${encodeURIComponent(this.selectedType)}`;
         }
 
-        const response = await axios.get(`http://localhost:8026/api/work_order/items${queryString}`);
+        const response = await axios.get(`http://122.51.210.27:8026/api/work_order/items${queryString}`);
         this.data = response.data;
         // 遍历 data 数组，格式化 up_timestamp 字段
         this.data.forEach(item => {
@@ -339,7 +339,7 @@ export default {
 
     async deleteItem(id) {
       try {
-        await axios.delete(`http://localhost:8026/api/work_order/items/${id}`);
+        await axios.delete(`http://122.51.210.27:8026/api/work_order/items/${id}`);
         await this.fetchData();
         console.log('工单删除成功', id);
       } catch (error) {
@@ -348,7 +348,7 @@ export default {
     },
     async updateItem(id, status) {
       try {
-        await axios.put(`http://localhost:8026/api/work_order/items/${id}`, {data: {state: status}});
+        await axios.put(`http://122.51.210.27:8026/api/work_order/items/${id}`, {data: {state: status}});
         await this.fetchData();
         console.log('状态修改成功', id);
       } catch (error) {
@@ -388,6 +388,7 @@ export default {
       // 遍历 selectedRowKeys 数组，对每个选中的行执行批量承接操作
       this.selectedRowKeys.forEach(key => {
         const selectedRow = this.data.find(row => row[this.rowKey] === key);
+
         if (selectedRow) {
           // 调用单个承接操作函数
           this.handleUpdate(selectedRow, '已承接但未完成');

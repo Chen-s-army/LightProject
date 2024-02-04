@@ -125,7 +125,7 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const response = await axios.get('http://localhost:8026/api/light_data/items');
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items');
         this.originalData = response.data;
 
         const groupedData = {};

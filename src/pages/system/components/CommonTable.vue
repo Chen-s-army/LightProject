@@ -70,10 +70,10 @@
                 <t-select
                   v-model="formData.status"
                   :auto-width="true"
+                  :clearable="true"
                   :options="LIGHT_CONTROL"
                   class="form-item-content`"
                   placeholder="选择操作类型"
-                  :clearable="true"
                 />
               </t-form-item>
             </t-col>
@@ -130,10 +130,12 @@
               </t-form-item>
             </t-col>
             <t-col>
-              <t-button variant="base" @click="sendMqttMessage('setLightMode','ChangLiang');updateData('常亮','light_mode')">
+              <t-button variant="base"
+                        @click="sendMqttMessage('setLightMode','ChangLiang');updateData('常亮','light_mode')">
                 常亮
               </t-button>
-              <t-button variant="base" @click="sendMqttMessage('setLightMode','ChangMie');updateData('常灭','light_mode')">
+              <t-button variant="base"
+                        @click="sendMqttMessage('setLightMode','ChangMie');updateData('常灭','light_mode')">
                 常灭
               </t-button>
               <t-button variant="base" @click="sendMqttMessage('blink','闪一闪')">闪一闪</t-button>
@@ -162,10 +164,12 @@
           :loading="dataLoading"
           :pagination="pagination"
           :rowKey="rowKey"
+          :selected-row-keys="selectedRowKeys"
           :stripe="true"
           :verticalAlign="verticalAlign"
           @change="rehandleChange"
           @page-change="rehandlePageChange"
+          @select-change="rehandleSelectChange"
         >
           <template #op="slotProps">
             <t-popconfirm :on-confirm="() => handleDelete(slotProps.row)"
@@ -211,9 +215,9 @@
     </t-tabs>
     <t-dialog
       :confirmBtn="null"
-      top="4%"
       :visible.sync="functionVisible"
       header="更多功能"
+      top="4%"
       width="1200px"
     >
       <t-form
@@ -326,7 +330,7 @@
                     <t-space size="70px">
                       <t-slider v-model="light_value" style="margin-right: 184px"/>
                       <t-button
-                        @click="sendMqttMessage('setHighBright', light_value+'%');updateData(light_value+'%','high_bright')">
+                        @click="sendMqttMessage('setHighBright', light_value);updateData(light_value+'%','high_bright')">
                         发送
                       </t-button>
                     </t-space>
@@ -338,7 +342,7 @@
                     <t-space size="70px">
                       <t-slider v-model="light_value1" style="margin-right: 184px"/>
                       <t-button
-                        @click="sendMqttMessage('setStandbyBright', light_value1+'%');updateData(light_value1+'%','standby_bright')">
+                        @click="sendMqttMessage('setStandbyBright', light_value1);updateData(light_value1+'%','standby_bright')">
                         发送
                       </t-button>
                     </t-space>
@@ -796,6 +800,18 @@ import {
 import mqtt from "mqtt";
 import axios from "axios";
 
+function removeDuplicates(array) {
+  return array.reduce((uniqueItems, currentItem) => {
+    const isExist = uniqueItems.some(item => item.value === currentItem.value);
+
+    if (!isExist) {
+      uniqueItems.push(currentItem);
+    }
+
+    return uniqueItems;
+  }, []);
+}
+
 export default {
   name: 'list-table',
   components: {
@@ -1073,7 +1089,7 @@ export default {
         },
       ],
       columns1: [
-        {colKey: 'row-select', type: 'multiple', width: 20, fixed: 'left'},
+        // {colKey: 'row-select', type: 'multiple', width: 20, fixed: 'left'},
         {
           title: '网关',
           align: 'left',
@@ -1081,6 +1097,11 @@ export default {
           ellipsis: true,
           colKey: 'device_name',
           fixed: 'left',
+          attrs: {
+            style: {
+              fontWeight: 600,
+            },
+          },
         },
         {
           align: 'center',
@@ -1149,8 +1170,8 @@ export default {
     this.initMqtt();
     this.fetchData();
     this.timerId = setInterval(() => {
-      if(this.isPolling){
-      this.fetchData();
+      if (this.isPolling) {
+        this.fetchData();
       }
     }, 1000);
   },
@@ -1189,15 +1210,24 @@ export default {
           queryString += queryString ? `&address=${encodeURIComponent(this.selectedAddress)}` : `?address=${encodeURIComponent(this.selectedAddress)}`;
         }
 
-        const response = await axios.get(`http://localhost:8026/api/light_data/items${queryString}`);
+        const response = await axios.get(`http://122.51.210.27:8026/api/light_data/items${queryString}`);
 
         this.lightData = response.data;
         this.deviceData = response.data;
         // 对数据进行排序（如果需要的话）
         this.lightData.sort((a, b) => {
-          const clusterA = parseInt(a.cluster);
-          const clusterB = parseInt(b.cluster);
-          return clusterA - clusterB;
+          const clusterA_area = parseInt(a.area);
+          const clusterB_area = parseInt(b.area);
+
+          // 先按照 area 排序
+          if (clusterA_area !== clusterB_area) {
+            return clusterA_area - clusterB_area;
+          } else {
+            // 如果 area 相同，则按照 number 排序
+            const clusterA_number = parseInt(a.number);
+            const clusterB_number = parseInt(b.number);
+            return clusterA_number - clusterB_number;
+          }
         });
         this.lightData.forEach(item => {
           item.ConsumptionUpdate = this.formatTimestamp(item.ConsumptionUpdate);
@@ -1226,11 +1256,12 @@ export default {
      * 根据网关下拉选项更新区下拉选项值
      */
     async handleGatewayChange() {
+
       // 获取过滤后的区的选项
-      this.AREA = [...new Set(this.lightData.filter(item => item.device_name === this.formData.device_name).map(item => ({
+      this.AREA = removeDuplicates(this.lightData.filter(item => item.device_name === this.formData.device_name).map(item => ({
         label: item.area,
         value: item.area,
-      })))];
+      })));
 
       // 清空其他下拉菜单的选中值
       this.formData.area = '';
@@ -1245,16 +1276,16 @@ export default {
     async handleAreaChange() {
 
       // 获取过滤后的组的选项
-      this.CLUSTER = [...new Set(this.lightData.filter(item => item.device_name === this.formData.device_name && item.area === this.formData.area).map(item => ({
+      this.CLUSTER = removeDuplicates(this.lightData.filter(item => item.device_name === this.formData.device_name && item.area === this.formData.area).map(item => ({
         label: item.cluster,
         value: item.cluster,
-      })))];
+      })));
 
       // 获取过滤后的号的选项
-      this.NUMBER = [...new Set(this.lightData.filter(item => item.device_name === this.formData.device_name && item.area === this.formData.area).map(item => ({
+      this.NUMBER = removeDuplicates(this.lightData.filter(item => item.device_name === this.formData.device_name && item.area === this.formData.area).map(item => ({
         label: item.number,
         value: item.number,
-      })))];
+      })));
 
       this.formData.cluster = '';
       this.formData.number = '';
@@ -1273,7 +1304,7 @@ export default {
         };
 
         // 使用查询参数调用后端接口
-        const response = await axios.post('http://localhost:8026/api/light_data/search', searchParams);
+        const response = await axios.post('http://122.51.210.27:8026/api/light_data/search', searchParams);
 
         // 将后端返回的数据存储到已有的数据集中
         this.lightData = response.data;
@@ -1332,7 +1363,7 @@ export default {
           [listName]: value,
         };
         console.log(updatePayload);
-        let url = `http://localhost:8026/api/light_data/items`;
+        let url = `http://122.51.210.27:8026/api/light_data/items`;
 
         if (this.formData.device_name !== undefined && this.formData.device_name !== null && this.formData.device_name !== '') {
           url += `/${encodeURIComponent(this.formData.device_name)}`;
@@ -1387,7 +1418,7 @@ export default {
      */
     async deleteItem(uuid) {
       try {
-        await axios.delete(`http://localhost:8026/api/light_data/items/${uuid}`);
+        await axios.delete(`http://122.51.210.27:8026/api/light_data/items/${uuid}`);
         await this.fetchData();
         console.log('灯具删除成功', uuid);
       } catch (error) {
@@ -1408,24 +1439,24 @@ export default {
      */
     getModeLabel(mode) {
       switch (mode) {
-        case "1":
-          return "常亮";
-        case "2":
-          return "常灭";
-        case "3":
-          return "感应";
-        case "4":
-          return "一段";
-        case "5":
-          return "二段";
-        case "6":
-          return "无效";
-        case "7":
-          return "自控";
-        case "8":
-          return "被控";
-        default:
-          return ""; // Handle default case if needed
+      case "1":
+        return "常亮";
+      case "2":
+        return "常灭";
+      case "3":
+        return "感应";
+      case "4":
+        return "一段";
+      case "5":
+        return "二段";
+      case "6":
+        return "无效";
+      case "7":
+        return "自控";
+      case "8":
+        return "被控";
+      default:
+        return ""; // Handle default case if needed
       }
     },
     convertUnixTimestampToDateTime(unixTimestamp) {
@@ -1447,8 +1478,9 @@ export default {
     rehandleChange(changeParams, triggerAndData) {
       console.log('统一Change', changeParams, triggerAndData);
     },
-    rehandleClickOp({text, row}) {
-      console.log(text, row);
+    rehandleSelectChange(value, {selectedRowData}) {
+      this.selectedRowKeys = value;
+      console.log(value, selectedRowData);
     },
     handleClickDelete(row) {
       this.deleteIdx = row.rowIndex;
@@ -1513,7 +1545,7 @@ export default {
           console.log('消息订阅失败')
         }
       })
-      const arr1 = ['led/emqx', 'temp_hum/emqx']
+      const arr1 = ['led/emqx', 'temp_hum/emqx', 'led/led']
       this.client1.subscribe(arr1, {qos: 1}, (err) => {
         if (!err) {
           console.log(`主题为：“${arr1}” 的消息订阅成功`)
@@ -1558,13 +1590,13 @@ export default {
         code: this.formData.code,
         deviceName: this.formData.device_name,
         area: this.formData.area,
-        address: this.formData.number,
+        address: "",
         action: action,
-        params: mode,
+        params: `${mode}`,
         identity: ""
       };
-
-      const jsonString = JSON.stringify(message);
+      message.address = this.formData.number ? this.formData.number : (this.formData.cluster ? this.formData.cluster : "");
+      const jsonString = JSON.stringify(message, null, 2);
       this.publish("led/led", jsonString);
     },
     /**

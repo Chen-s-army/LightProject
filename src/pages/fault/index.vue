@@ -123,7 +123,7 @@ export default Vue.extend({
     async fetchData() {
       try {
         // 使用筛选参数进行API请求
-        const response = await axios.get('http://localhost:8026/api/light_data/items');
+        const response = await axios.get('http://122.51.210.27:8026/api/light_data/items');
 
         // 对数据进行处理，比较 ConsumptionUpdate 列和当前时间
         const currentTime = new Date();
@@ -171,7 +171,7 @@ export default Vue.extend({
       try {
         // 先检查工单是否已经存在
         const notes = `${device.area} 区 ${device.cluster} 组 ${device.number} 号 灯具2小时未更新`;
-        const checkResponse = await axios.get(`http://localhost:8026/api/work_order/check/${encodeURIComponent(notes)}/未承接`);
+        const checkResponse = await axios.get(`http://122.51.210.27:8026/api/work_order/check/${encodeURIComponent(notes)}/未承接`);
 
         if (checkResponse.data.exists) {
           console.log('工单已存在，不进行创建');
@@ -200,7 +200,7 @@ export default Vue.extend({
         };
 
         // 发送创建工单的 HTTP 请求
-        const response = await axios.post(`http://localhost:8026/api/work_order/items`, {data: dataToCreate});
+        const response = await axios.post(`http://122.51.210.27:8026/api/work_order/items`, {data: dataToCreate});
 
         // 处理响应，显示成功消息等
         console.log(response.data);
